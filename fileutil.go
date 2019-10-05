@@ -1,4 +1,4 @@
-package nastran_mtract
+package main
 
 import (
 	"os"
