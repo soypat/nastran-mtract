@@ -36,13 +36,51 @@ func main() {
 
 	select { // File selector!
 	case fileSelection = <-selly.selection:
-		poller.askedToPoll <- false
+		//poller.askedToPoll <- false
 	}
+	poller.askedToPoll <- false
 	fileDir := fileNames[fileSelection]
 	fileDir = fileDir[2:]
 	err = writeNodosCSV("nodos.csv", fileDir)
 	if err != nil {
 		return
+	}
+	// MENU PARA ELEGIR NUMERACION DE ELEMENTOS
+	elementNumberingSelector := NewSelector()
+	elementNumberingSelector.options = []string{"ADINA", "NASTRAN"}
+	elementNumberingSelector.title = "Elegir tipo de numeración"
+	elementNumberingSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{1, 3, 0}, [3]int{2, 3, 0})
+	poller.selector = &elementNumberingSelector
+	elementNumberingSelector.Init()
+	elementNumberingSelector.Render()
+	poller.askedToPoll <- true
+	var elementNumbering int
+	select {
+	case elementNumbering = <-elementNumberingSelector.selection:
+
+	}
+	elementNumbering++
+	// MESH COLLECTOR MENU
+	meshcol, err := readMeshCollectors(fileDir)
+	if err != nil {
+		return
+	}
+	collectorSelector := NewSelector()
+	collectorSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{1, 3, 0}, [3]int{2, 3, 0})
+	collectorSelector.options = meshcol.KeySlice()
+	collectorSelector.title = "Procesamiento de colector"
+	poller.selector = &collectorSelector
+	collectorSelector.Init()
+	collectorSelector.Render()
+	//poller.askedToPoll<-true
+	var collectorSelection int
+	select {
+	case collectorSelection = <-collectorSelector.selection:
+	}
+
+	err = writeMeshCollector(fileDir, collectorSelector.options[collectorSelection], elementNumbering)
+	if err != nil {
+		panic("Could not write mesh collector")
 	}
 
 }

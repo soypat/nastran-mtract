@@ -45,9 +45,17 @@ func getRequest(response <-chan bool, currentUnderstanding bool) bool { // Basic
 }
 
 func (poller *thePoller) Poll2(askToPoll <-chan bool) {
+	var c ui.Event
+	var ok = true
 	for {
-		poller.isPolling = getRequest(poller.askedToPoll, poller.isPolling) // getRequest is a basic concurrency function!
-		c, ok := <-poller.event
+		//poller.isPolling = getRequest(poller.askedToPoll, poller.isPolling) // getRequest is a basic concurrency function!
+		poller.isPolling = getRequest(askToPoll, poller.isPolling) // getRequest is a basic concurrency function!
+		if poller.isPolling {
+			select {
+			case c, ok = <-poller.event:
+			}
+		}
+
 		if !ok {
 			log.Fatal("Unexpected key polling channel close.")
 			return // Return on unexpected key polling close if fatal log doesent do job
@@ -63,12 +71,16 @@ func (poller *thePoller) Poll2(askToPoll <-chan bool) {
 			}
 
 		} else if poller.isPolling == false {
-			_, ok := <-askToPoll
+			request, ok := <-askToPoll
 			if !ok {
 				return // Return on channel closed
 			}
-			time.Sleep(time.Millisecond * 20) // Si no estoy polleando espero un rato para relajar uso de procesador}
+			if request {
+				poller.isPolling = true
+			}
+			time.Sleep(time.Millisecond * 30) // Si no estoy polleando espero un rato para relajar uso de procesador}
 		} else {
+			log.Fatal("Close of polling channel on poller!")
 			return // RETURN ON NIL VAL
 		}
 	}
