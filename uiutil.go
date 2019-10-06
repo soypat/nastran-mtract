@@ -35,7 +35,7 @@ func CreateFitting(wS [3]int, hS [3]int, wE [3]int, hE [3]int) *fitting {
 	return &P
 }
 
-func (P fitting) getRect() (int, int, int, int) {
+func (P *fitting) getRect() (int, int, int, int) {
 	width, height := ui.TerminalDimensions()
 	return width*P.widthStart[0]/P.widthStart[1] + P.widthStart[2], height*P.heightStart[0]/P.heightStart[1] + P.heightStart[2], width*P.widthEnd[0]/P.widthEnd[1] + P.widthEnd[2], height*P.heightEnd[0]/P.heightEnd[1] + P.heightEnd[2]
 }

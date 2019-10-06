@@ -35,6 +35,7 @@ func (seltr *selector) associateList() {
 	seltr.associatedList.SelectedRowStyle = ui.NewStyle(seltr.selectedColor)
 	seltr.associatedList.SetRect(seltr.fitting.getRect())
 	seltr.associatedList.Border = seltr.border
+	seltr.associatedList.Title = seltr.title
 	//seltr.associatedList.SelectedRow = seltr.selection // DO NOT ADD THIS! RISK OF TOTAL UTTER BREAKAGE
 }
 
@@ -69,4 +70,19 @@ func (seltr *selector) renderAction(ID *string) {
 		time.Sleep(time.Millisecond * 15)
 	}
 	seltr.Render()
+}
+
+func (seltr *selector) GetDims() (X int, Y int) {
+	x1, y1, x2, y2 := seltr.getRect()
+	if x1 > x2 {
+		X = x1 - x2
+	} else {
+		X = x2 - x1
+	}
+	if y1 > y2 {
+		Y = y1 - y2
+	} else {
+		Y = y2 - y1
+	}
+	return X, Y
 }
