@@ -6,9 +6,9 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
-//var elementTypes = []string{"CHEXA","CTETRA","CBEAM"}
 var constraintTypes = []string{"RBE2", "RBE3", "RBE1"}
 var reElementStart = regexp.MustCompile(`[A-Z]{2,7}[\s\d]+[\+\n]`)
 var reBeamStart = regexp.MustCompile(`[A-Z]{2,7}[\s\d]+[.]{1}`)
@@ -47,6 +47,11 @@ func NewElement() element {
 }
 
 type collectors map[string]int
+
+type writerGroup struct {
+	writer *bufio.Writer
+	file   *os.File
+}
 
 type constraint struct {
 	number    int
@@ -118,30 +123,151 @@ func writeMeshCollector(nastrandir string, Acol string, numbering int) error {
 	if err != nil {
 		return err
 	}
-	//writers := make(map[string]*bufio.Writer)
+	writers := make(map[string]writerGroup)
 
 	defer dataFile.Close()
 	scanner := bufio.NewScanner(dataFile)
-	reCollectorName := regexp.MustCompile(Acol)
+	//reCollectorName := regexp.MustCompile(Acol)
 	line := 0
+
 	for scanner.Scan() {
 		text := scanner.Text()
 		text = text + ""
 		line++
-		if reCollectorName.MatchString(scanner.Text()) {
+		if strings.Contains(scanner.Text(), Acol) {
+			scanner.Scan()
 			for scanner.Scan() {
 				line++
-				if reNASTRANcomment.MatchString(scanner.Text()) {
+				if reNASTRANcomment.MatchString(scanner.Text()) && !(strings.Contains(scanner.Text(), Acol)) {
 					break
 				}
-				//TODO do the map[string]writer thingamagig
-
+				constrainto, elemento, linesRead, err := readNextElement(scanner)
+				if err != nil {
+					return err
+				}
+				line += linesRead
+				if elemento.nodeIndex != nil { // Si es un elemento, lo escribo a su respectivo archivo
+					elementTag := generateElementTag(*elemento)
+					_, present := writers[elementTag]
+					if !present { // Si no hay un archivo correspondiente al elemento, lo creo
+						elementFile, err := os.Create(elementTag + fmt.Sprintf("-%d", elemento.collector) + ".csv")
+						if err != nil {
+							return err
+						}
+						elementWriter := bufio.NewWriter(elementFile)
+						writers[elementTag] = writerGroup{
+							writer: elementWriter,
+							file:   elementFile,
+						}
+						defer writers[elementTag].Close()
+					}
+					// Sigo acá, Ahora si o si tengo un archivo para escribir
+					err = writeElement(elemento, writers[elementTag].writer, numbering)
+					if err != nil {
+						return err
+					}
+					err = writers[elementTag].writer.Flush()
+					if err != nil {
+						return err
+					}
+					continue
+				}
+				if constrainto.slaves != nil { // Si es un constraint
+					_, present := writers[constrainto.Type]
+					if !present { // Si no hay un archivo correspondiente al elemento, lo creo
+						constraintFile, err := os.Create(constrainto.Type + "-" + Acol + ".csv")
+						if err != nil {
+							return err
+						}
+						constraintWriter := bufio.NewWriter(constraintFile)
+						writers[constrainto.Type] = writerGroup{
+							writer: constraintWriter,
+							file:   constraintFile,
+						}
+						defer writers[constrainto.Type].Close()
+					}
+					err = writeConstraint(constrainto, writers[constrainto.Type].writer)
+					writers[constrainto.Type].writer.Flush()
+					if err != nil {
+						return err
+					}
+					err = writers[constrainto.Type].writer.Flush()
+					if err != nil {
+						return err
+					}
+					break // break para no saltear el prox rigid link
+				}
 			}
 
 		}
 
 	}
 	//nodeFile, err := os.Create(writedir)
+	return nil
+}
+
+func writeConstraint(constrainto *constraint, writer *bufio.Writer) error {
+	_, err := writer.WriteString(fmt.Sprintf("%d", constrainto.number))
+	if err != nil {
+		return err
+	}
+	_, err = writer.WriteString(fmt.Sprintf(",%d", constrainto.master))
+	if err != nil {
+		return err
+	}
+	for _, v := range constrainto.slaves {
+		_, err = writer.WriteString(fmt.Sprintf(",%d", v))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = writer.WriteString(fmt.Sprintf("\n"))
+	return err
+}
+
+func writeElement(elemento *element, writer *bufio.Writer, numbering int) error {
+	// numbering == 0, ADINA.    numbering == 1  NASTRAN
+	_, err := writer.WriteString(fmt.Sprintf("%d", elemento.number))
+	if err != nil {
+		return err
+	}
+	var elemIndex []int
+	switch numbering {
+	case 0: // ADINA
+		switch len(elemento.nodeIndex) {
+		case 4: // T4 (Tetraedro 4 nodos)
+			elemIndex = []int{1, 2, 3, 4}
+		case 10: // T10
+			elemIndex = []int{1, 2, 3, 4, 5, 7, 8, 6, 10, 9}
+		case 8:
+			elemIndex = []int{6, 2, 3, 7, 5, 1, 4, 8}
+		case 20:
+			elemIndex = []int{6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}
+		default:
+			elemIndex = irange(1, len(elemento.nodeIndex))
+		}
+	default:
+		elemIndex = irange(1, len(elemento.nodeIndex))
+	}
+	for _, v := range elemIndex {
+		_, err := writer.WriteString(fmt.Sprintf(",%d", elemento.nodeIndex[v-1]))
+		if err != nil {
+			return err
+		}
+	}
+	if !(elemento.orientation[0] == 0 && elemento.orientation[1] == 0 && elemento.orientation[2] == 0) {
+		for v := range elemento.orientation {
+			_, err := writer.WriteString(fmt.Sprintf(",%e", elemento.orientation[v]))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Newline
+	_, err = writer.WriteString(fmt.Sprintf("\n"))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -329,4 +455,30 @@ func assignDims(dimensions *dims, floatString []string) {
 			panic("Unreachable")
 		}
 	}
+}
+
+func generateElementTag(elemento element) string {
+	Nnodos := len(elemento.nodeIndex)
+	return elemento.Type + strconv.Itoa(Nnodos)
+}
+
+func (group writerGroup) Close() {
+	group.writer.Flush()
+
+	group.file.Sync()
+	group.file.Close()
+}
+
+func irange(int1 int, int2 int) []int {
+	slice := make([]int, 0)
+	if int1 < int2 {
+		for i := int1; i <= int2; i++ {
+			slice = append(slice, i)
+		}
+	} else {
+		for i := int1; i >= int2; i-- {
+			slice = append(slice, i)
+		}
+	}
+	return slice
 }

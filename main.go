@@ -4,6 +4,7 @@ import (
 	ui "github.com/gizak/termui/v3"
 	_ "github.com/gizak/termui/v3/widgets"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -59,14 +60,13 @@ func main() {
 	case elementNumbering = <-elementNumberingSelector.selection:
 
 	}
-	elementNumbering++
 	// MESH COLLECTOR MENU
 	meshcol, err := readMeshCollectors(fileDir)
 	if err != nil {
 		return
 	}
 	collectorSelector := NewSelector()
-	collectorSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{1, 3, 0}, [3]int{2, 3, 0})
+	collectorSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{2, 3, 0}, [3]int{3, 3, 0})
 	collectorSelector.options = meshcol.KeySlice()
 	collectorSelector.title = "Procesamiento de colector"
 	poller.selector = &collectorSelector
@@ -74,15 +74,30 @@ func main() {
 	collectorSelector.Render()
 	//poller.askedToPoll<-true
 	var collectorSelection int
-	select {
-	case collectorSelection = <-collectorSelector.selection:
-	}
+	for {
+		select {
+		case collectorSelection = <-collectorSelector.selection:
+			collectorSelectionNumber := meshcol[collectorSelector.options[collectorSelection]]
+			collectorName := collectorSelector.options[collectorSelection]
+			if collectorSelectionNumber == 0 { // Constraint Selection
+				err = writeMeshCollector(fileDir, collectorName, elementNumbering)
+				if err != nil {
+					collectorSelector.title = "Error al leer constraint collector."
+					collectorSelector.Render()
+				} else {
+					collectorSelector.title = "Completed constraint: " + collectorName + ". Presione [q] para salir."
+					collectorSelector.Render()
+				}
 
-	err = writeMeshCollector(fileDir, collectorSelector.options[collectorSelection], elementNumbering)
-	if err != nil {
-		panic("Could not write mesh collector")
+			} else {
+				err = writeMeshCollector(fileDir, collectorName, elementNumbering)
+				collectorSelector.title = "Completed " + strconv.Itoa(collectorSelectionNumber) + ". Presione [q] para salir. Patricio Whittingslow 2019. Github: soypat"
+				collectorSelector.Render()
+			}
+		}
+		time.Sleep(time.Millisecond * 14)
 	}
-
+	// end of program.
 }
 
 func dbslp() { // Debug sleep
