@@ -309,6 +309,7 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 			} // Llegado a este punto arme eleLine!
 		}
 	}
+	eleLine = eleLine + " "// this space is for the regex to work consistently when last node is single digit :( not too happy about it. looking for elegant solution.
 	for _, v := range constraintTypes {
 		if v == eleType { //if true we are dealing with a constraint
 			integerStrings := reInteger.FindAllString(eleLine, -1)
