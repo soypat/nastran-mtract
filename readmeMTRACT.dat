@@ -1,0 +1,23 @@
+                 _                         __  __ _______ _____            _____ _______ 
+                | |                       |  \/  |__   __|  __ \     /\   / ____|__   __|
+ _ __   __ _ ___| |_ _ __ __ _ _ __ ______| \  / |  | |  | |__) |   /  \ | |       | |   
+| '_ \ / _` / __| __| '__/ _` | '_ \______| |\/| |  | |  |  _  /   / /\ \| |       | |   
+| | | | (_| \__ \ |_| | | (_| | | | |     | |  | |  | |  | | \ \  / ____ \ |____   | |   
+|_| |_|\__,_|___/\__|_|  \__,_|_| |_|     |_|  |_|  |_|  |_|  \_\/_/    \_\_____|  |_|   
+
+Correr en la carpeta donde se encuentra el archivo NASTRAN (formato .dat preferible)
+
+Seguir las instrucciones. Usar flechas para navegar y presionar [ENTER]/[INTRO] 
+para seleccionar opción.
+
+OUTPUT  NODO: nodos.csv
+
+NroNodo,  x,  y,  z,  csys/t
+
+OUTPUT ELEMENTO:  tipoElemento(NroNodos)-(NroColector).csv
+
+NroElemento,  Nodo1,  Nodo2,  Nodo3, .... ,  NodoN
+
+OUTPUT CONSTRAINT:  tipoConstraint-(NombreColector).csv
+
+NroElemento,  NodoMaster,  NodoSlave1,  NodoSlave2 ..., NodoSlaveN
