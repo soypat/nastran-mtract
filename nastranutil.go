@@ -411,7 +411,7 @@ func writeNodosCSV(writedir string, nastrandir string) error {
 	reNodeNumber := regexp.MustCompile(`(?:GRID\*\s+)([\d]+)`)
 	reNonNumerical := regexp.MustCompile(`[A-Za-z\*\+\-\s,]+`)
 	reLineContinueFlag := regexp.MustCompile(`\+{1}\n*$`)
-	reFloat := regexp.MustCompile(`\d{1}\.\d{4,16}E{1}[\+\-]{1}\d{2}`)
+	reFloat := regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4,16}E{1}[\+\-]{1}\d{2}`)
 	var nodeNumberString, currentText string
 	var floatStrings []string //integerStrings
 	var nodoLineText string
