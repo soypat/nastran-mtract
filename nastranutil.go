@@ -11,16 +11,16 @@ import (
 
 var constraintTypes = []string{"RBE2", "RBE3", "RBE1"}
 var reElementStart = regexp.MustCompile(`[A-Z]{2,7}[\s\d]+[\+\n]`)
-var reBeamStart = regexp.MustCompile(`[A-Z]{2,7}[\s\d]+[.]{1}`)
+var reBeamStart = regexp.MustCompile(`^[A-Z]BEAM`)
 var reElementType = regexp.MustCompile(`^[A-Z]{2,7}[\d]{0,2}`)
 var reElemEnd = regexp.MustCompile(`PROPERTY CARDS`)
 var reEOLContinue = regexp.MustCompile(`[+]{1}$`)
 var reSOLContinue = regexp.MustCompile(`^[+]{1}`)
 var reInteger = regexp.MustCompile(`\s+\d+[^.A-Za-z+\$]`)
-var reDecimal = regexp.MustCompile(`\d{1}\.\d{4}`)
+var reDecimal = regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4}`)
 var reNonNumerical = regexp.MustCompile(`[A-Za-z\*\+\-\s,]+`)
 var reNASTRANcomment = regexp.MustCompile(`^[$]`)
-
+var reExp = regexp.MustCompile(`[\+|\-]\d{1,2}$`)
 type dims struct {
 	x    float64
 	y    float64
@@ -99,6 +99,8 @@ func readMeshCollectors(nastrandir string) (collectors, error) {
 		if reMeshCol.MatchString(scanner.Text()) { // I first find my mesh collector here
 			collectorName := scanner.Text()[20:]
 			// meshcol.tags =append(meshcol.tags, scanner.Text()[20:])
+			text = scanner.Text()
+			text = text+""
 			currentConstraint, currentElement, linesRead, err := readNextElement(scanner)
 			if err != nil {
 				return meshcol, err
@@ -329,27 +331,21 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 	}
 	if !reElementStart.MatchString(eleLine) && reBeamStart.MatchString(eleLine) { // We are dealing with a beam
 		integerStrings := reInteger.FindAllString(eleLine, -1)
-		decimalStrings := reDecimal.FindAllString(eleLine, -1)
+		//decimalStrings := reDecimal.FindAllString(eleLine, -1)
+		eleitem.orientation = [3]float64{}
+		for v := range eleitem.orientation {
+			eleitem.orientation[v],err = parseFortranFloat(eleLine[40+v*8:48+v*8])
+			if err!= nil {
+				return &constraintitem, &eleitem, linesScanned, err
+			}
+		}
+
 		eleitem.number, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[0], ""))
 		if err != nil {
 			return &constraintitem, &eleitem, linesScanned, err
 		}
-		if len(decimalStrings) != 3 {
-			return &constraintitem, &eleitem, linesScanned, fmt.Errorf("Error leyendo orientación del elemento %d. Se esperaban 3 numeros", eleitem.number)
-		}
-		orient1, err := strconv.ParseFloat(decimalStrings[0], 64)
-		if err != nil {
-			return &constraintitem, &eleitem, linesScanned, fmt.Errorf("Error leyendo orientación del elemento %d. Orientacion 1 mal parseada.", eleitem.number)
-		}
-		orient2, err := strconv.ParseFloat(decimalStrings[1], 64)
-		if err != nil {
-			return &constraintitem, &eleitem, linesScanned, fmt.Errorf("Error leyendo orientación del elemento %d. Orientacion 2 mal parseada.", eleitem.number)
-		}
-		orient3, err := strconv.ParseFloat(decimalStrings[2], 64)
-		if err != nil {
-			return &constraintitem, &eleitem, linesScanned, fmt.Errorf("Error leyendo orientación del elemento %d. Orientacion 3 mal parseada.", eleitem.number)
-		}
-		eleitem.orientation = [3]float64{orient1, orient2, orient3}
+
+
 		eleitem.collector, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[1], ""))
 		if err != nil {
 			return &constraintitem, &eleitem, linesScanned, err
@@ -384,6 +380,22 @@ func Aslicetoi(stringSlice []string) ([]int, error) {
 	return intSlice, nil
 }
 
+func parseFortranFloat(forstr string) (float64,error) {
+	var thefloat float64
+	forstr = strings.Trim(forstr," ")
+	expString := reExp.FindString(forstr)
+	var err error
+	if expString != "" {
+		thefloat,err = strconv.ParseFloat( forstr[0:5] + "E" + expString,64 )
+	} else {
+		thefloat,err = strconv.ParseFloat(forstr , 64)
+	}
+	if err !=nil {
+		return thefloat,nil
+	}
+	return thefloat,nil
+}
+
 func (meshcol collectors) KeySlice() []string {
 	keys := make([]string, 0, len(meshcol))
 	for k := range meshcol {
@@ -411,7 +423,7 @@ func writeNodosCSV(writedir string, nastrandir string) error {
 	reNodeNumber := regexp.MustCompile(`(?:GRID\*\s+)([\d]+)`)
 	reNonNumerical := regexp.MustCompile(`[A-Za-z\*\+\-\s,]+`)
 	reLineContinueFlag := regexp.MustCompile(`\+{1}\n*$`)
-	reFloat := regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4,16}E{1}[\+\-]{1}\d{2}`)
+	reFloat := regexp.MustCompile(`\d{1}\.\d{4,16}E{1}[\+\-]{1}\d{2}`)
 	var nodeNumberString, currentText string
 	var floatStrings []string //integerStrings
 	var nodoLineText string
