@@ -21,6 +21,7 @@ var reDecimal = regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4}`)
 var reNonNumerical = regexp.MustCompile(`[A-Za-z\*\+\-\s,]+`)
 var reNASTRANcomment = regexp.MustCompile(`^[$]`)
 var reExp = regexp.MustCompile(`[\+|\-]\d{1,2}$`)
+
 type dims struct {
 	x    float64
 	y    float64
@@ -100,7 +101,7 @@ func readMeshCollectors(nastrandir string) (collectors, error) {
 			collectorName := scanner.Text()[20:]
 			// meshcol.tags =append(meshcol.tags, scanner.Text()[20:])
 			text = scanner.Text()
-			text = text+""
+			text = text + ""
 			currentConstraint, currentElement, linesRead, err := readNextElement(scanner)
 			if err != nil {
 				return meshcol, err
@@ -136,11 +137,11 @@ func writeMeshCollector(nastrandir string, Acol string, numbering int) error {
 		text := scanner.Text()
 		text = text + ""
 		line++
-		if strings.Contains(scanner.Text(), Acol) {
+		if strings.Contains(scanner.Text(), "$*  Mesh Collector: "+Acol) {
 			scanner.Scan()
 			for scanner.Scan() {
 				line++
-				if reNASTRANcomment.MatchString(scanner.Text()) && !(strings.Contains(scanner.Text(), Acol)) {
+				if reNASTRANcomment.MatchString(scanner.Text()) && !(strings.Contains(scanner.Text(), "$*  Mesh Collector: "+Acol)) {
 					break
 				}
 				constrainto, elemento, linesRead, err := readNextElement(scanner)
@@ -311,7 +312,7 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 			} // Llegado a este punto arme eleLine!
 		}
 	}
-	eleLine = eleLine + " "// this space is for the regex to work consistently when last node is single digit :( not too happy about it. looking for elegant solution.
+	eleLine = eleLine + " " // this space is for the regex to work consistently when last node is single digit :( not too happy about it. looking for elegant solution.
 	for _, v := range constraintTypes {
 		if v == eleType { //if true we are dealing with a constraint
 			integerStrings := reInteger.FindAllString(eleLine, -1)
@@ -334,8 +335,8 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 		//decimalStrings := reDecimal.FindAllString(eleLine, -1)
 		eleitem.orientation = [3]float64{}
 		for v := range eleitem.orientation {
-			eleitem.orientation[v],err = parseFortranFloat(eleLine[40+v*8:48+v*8])
-			if err!= nil {
+			eleitem.orientation[v], err = parseFortranFloat(eleLine[40+v*8 : 48+v*8])
+			if err != nil {
 				return &constraintitem, &eleitem, linesScanned, err
 			}
 		}
@@ -344,7 +345,6 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 		if err != nil {
 			return &constraintitem, &eleitem, linesScanned, err
 		}
-
 
 		eleitem.collector, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[1], ""))
 		if err != nil {
@@ -380,20 +380,20 @@ func Aslicetoi(stringSlice []string) ([]int, error) {
 	return intSlice, nil
 }
 
-func parseFortranFloat(forstr string) (float64,error) {
+func parseFortranFloat(forstr string) (float64, error) {
 	var thefloat float64
-	forstr = strings.Trim(forstr," ")
+	forstr = strings.Trim(forstr, " ")
 	expString := reExp.FindString(forstr)
 	var err error
 	if expString != "" {
-		thefloat,err = strconv.ParseFloat( forstr[0:5] + "E" + expString,64 )
+		thefloat, err = strconv.ParseFloat(forstr[0:5]+"E"+expString, 64)
 	} else {
-		thefloat,err = strconv.ParseFloat(forstr , 64)
+		thefloat, err = strconv.ParseFloat(forstr, 64)
 	}
-	if err !=nil {
-		return thefloat,nil
+	if err != nil {
+		return thefloat, nil
 	}
-	return thefloat,nil
+	return thefloat, nil
 }
 
 func (meshcol collectors) KeySlice() []string {
