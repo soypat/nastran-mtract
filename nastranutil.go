@@ -103,10 +103,10 @@ func readMeshCollectors(nastrandir string) (collectors, error) {
 			text = scanner.Text()
 			text = text + ""
 			currentConstraint, currentElement, linesRead, err := readNextElement(scanner)
+			line += linesRead
 			if err != nil {
 				return meshcol, err
 			}
-			line += linesRead
 			if currentConstraint.slaves != nil {
 				meshcol[collectorName] = currentConstraint.collector
 				continue
@@ -331,8 +331,18 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 		}
 	}
 	if !reElementStart.MatchString(eleLine) && reBeamStart.MatchString(eleLine) { // We are dealing with a beam
-		integerStrings := reInteger.FindAllString(eleLine, -1)
-		//decimalStrings := reDecimal.FindAllString(eleLine, -1)
+		integerList := []int{} // two nodes in integerStrings
+
+		for i:=0; i<=3 ; i++ {
+			myCurrentInt, err := strconv.Atoi(reNonNumerical.ReplaceAllString(eleLine[(i+1)*8:(i+2)*8], ""))
+			if err != nil {
+				return &constraintitem, &eleitem, linesScanned, err
+			}
+			integerList = append(integerList, myCurrentInt ) // genero lista de BEAM integers. fixed width opportunity
+		}
+		eleitem.number = integerList[0]
+		eleitem.collector = integerList[1]
+		eleitem.nodeIndex = integerList[2:4]
 		eleitem.orientation = [3]float64{}
 		for v := range eleitem.orientation {
 			eleitem.orientation[v], err = parseFortranFloat(eleLine[40+v*8 : 48+v*8])
@@ -340,21 +350,8 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 				return &constraintitem, &eleitem, linesScanned, err
 			}
 		}
-
-		eleitem.number, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[0], ""))
-		if err != nil {
-			return &constraintitem, &eleitem, linesScanned, err
-		}
-
-		eleitem.collector, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[1], ""))
-		if err != nil {
-			return &constraintitem, &eleitem, linesScanned, err
-		}
 		eleitem.Type = "CBEAM"
-		eleitem.nodeIndex, err = Aslicetoi(integerStrings[2:4])
-
 		return &constraintitem, &eleitem, linesScanned, err
-
 	}
 	integerStrings := reInteger.FindAllString(eleLine, -1)
 	integerSlice, err := Aslicetoi(integerStrings)
