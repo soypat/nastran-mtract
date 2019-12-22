@@ -10,7 +10,7 @@ Run executable in directory above that of the NASTRAN file, which should be in .
 Follow on screen instructions (spanish). Use arrow-keys to navigate and press [ENTER]/[INTRO] 
 to select option.
 
-ADINA element node indexing only works for H8, H20, T4, T10 (3-D) elements.
+ADINA element node indexing only works for beams, constraints and H8, H20, T4, T10 (3-D) elements.
 
 
 OUTPUT  NODES: nodos.csv
