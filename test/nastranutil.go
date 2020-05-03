@@ -30,7 +30,7 @@ var reLoadCol = regexp.MustCompile(`\$\*\s{2}Load:\s{1}`)
 var reEOF = regexp.MustCompile(`ENDDATA`)
 //ELEMENT NUMBERING
 //var ADINA_N = [][]int{{1, 2, 3, 4}, {1, 2, 3, 4, 5, 7, 8, 6, 10, 9}, {6, 2, 3, 7, 5, 1, 4, 8}, {6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
-var ADINA = map[int][]int{4:{1, 2, 3, 4},10:{1, 2, 3, 4, 5, 7, 8, 6, 10, 9},8:{6, 2, 3, 7, 5, 1, 4, 8},20:{6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
+var ADINA = map[int][]int{10:{1, 2, 3, 4, 5, 7, 8, 6, 10, 9},8:{6, 2, 3, 7, 5, 1, 4, 8},20:{6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
 
 type dims struct {
 	x    float64
@@ -200,7 +200,7 @@ func writeEntity(E entity, writer *bufio.Writer, numbering int) error {
 	// Print connections
 	var connections = E.getConnections()
 	var connectionIndex []int
-	if numbering==0 && len(ADINA[len(connections)])>0 && E.isElement() {
+	if numbering==0 && len(ADINA[len(connections)])>0 && E.isElement() && E.getType() != "CQUAD8" {
 		connectionIndex = ADINA[len(connections)]
 	} else {
 		connectionIndex = irange(1,len(connections))
@@ -535,8 +535,12 @@ func (constrainto constraint)generateUniqueTag() string {
 }
 
 func (elemento element)generateUniqueTag() string {
+	name := elemento.getType()
+	if IsNumeric( string(name[len(name)-1]) ) {
+		return fmt.Sprintf(  "%s-%d",name, elemento.collector)
+	}
 	Nnodos := len(elemento.nodeIndex)
-	return fmt.Sprintf(  "%s%d-%d",elemento.Type, Nnodos, elemento.collector)
+	return fmt.Sprintf(  "%s%d-%d",name, Nnodos, elemento.collector)
 }
 
 func (group writerGroup) Close() {
@@ -583,4 +587,9 @@ func parseCollectorName(text string) string {
 		collectorName = text[strings.Index(text,":")+2:]
 	}
 	return collectorName
+}
+
+func IsNumeric(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }
