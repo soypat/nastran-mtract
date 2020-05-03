@@ -21,9 +21,9 @@ OUTPUT ELEMENT:  ElementType(NumberofNodes)-(CollectorNumber).csv
 
 ElementNumber, Node1, Node2, Node3, ... ,  NodeN
 
-OUTPUT CONSTRAINT:  ConstraintType-(CollectorName).csv
+OUTPUT CONSTRAINT:  ConstraintType-(CollectorNumber).csv
 
-ElementNumber,  NodeMaster, NodeSlave1, NodeSlave2, ... ,  NodeSlaveN
+affectedDOF , ElementNumber,  NodeMaster, NodeSlave1, NodeSlave2, ... ,  NodeSlaveN
 
 
 Written in Go.
