@@ -74,13 +74,14 @@ func main() {
 	collectorSelector.Render()
 	//poller.askedToPoll<-true
 	var collectorSelection int
+	var selectedEntity entity
 	for {
 		select {
 		case collectorSelection = <-collectorSelector.selection:
-			collectorSelectionNumber := meshcol[collectorSelector.options[collectorSelection]]
+			selectedEntity = meshcol[collectorSelector.options[collectorSelection]]
 			collectorName := collectorSelector.options[collectorSelection]
-			if collectorSelectionNumber == 0 { // Constraint Selection
-				err = writeMeshCollector(fileDir, collectorName, elementNumbering)
+			if selectedEntity.getNumber() == 0 { // Constraint Selection
+				err = writeCollector(fileDir, collectorName, elementNumbering)
 				if err != nil {
 					collectorSelector.title = "Error al leer constraint collector."
 					collectorSelector.Render()
@@ -88,10 +89,9 @@ func main() {
 					collectorSelector.title = "Completed constraint: " + collectorName + ". Presione [q] para salir."
 					collectorSelector.Render()
 				}
-
 			} else {
-				err = writeMeshCollector(fileDir, collectorName, elementNumbering)
-				collectorSelector.title = "Completed " + strconv.Itoa(collectorSelectionNumber) + ". Presione [q] para salir. Patricio Whittingslow 2019. Github: soypat"
+				err = writeCollector(fileDir, collectorName, elementNumbering)
+				collectorSelector.title = "Completed " + strconv.Itoa(selectedEntity.getNumber()) + ". Presione [q] para salir. Patricio Whittingslow 2019. Github: soypat"
 				collectorSelector.Render()
 			}
 		}

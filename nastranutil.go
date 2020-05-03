@@ -10,17 +10,27 @@ import (
 )
 
 var constraintTypes = []string{"RBE2", "RBE3", "RBE1"}
+var bcTypes = []string{"SPC", "FORCE"}
 var reElementStart = regexp.MustCompile(`[A-Z]{2,7}[\s\d]+[\+\n]`)
+var reSPCStart = regexp.MustCompile(`^SPC`)
+var reForceStart = regexp.MustCompile(`^FORCE`)
 var reBeamStart = regexp.MustCompile(`^[A-Z]BEAM`)
 var reElementType = regexp.MustCompile(`^[A-Z]{2,7}[\d]{0,2}`)
 var reElemEnd = regexp.MustCompile(`PROPERTY CARDS`)
 var reEOLContinue = regexp.MustCompile(`[+]{1}$`)
 var reSOLContinue = regexp.MustCompile(`^[+]{1}`)
 var reInteger = regexp.MustCompile(`\s+\d+[^.A-Za-z+\$]`)
-var reDecimal = regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4}`)
+//var reDecimal = regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4}`)
 var reNonNumerical = regexp.MustCompile(`[A-Za-z\*\+\-\s,]+`)
 var reNASTRANcomment = regexp.MustCompile(`^[$]`)
 var reExp = regexp.MustCompile(`[\+|\-]\d{1,2}$`)
+var reMeshCol = regexp.MustCompile(`\$\*\s{2}Mesh Collector:\s{1}`)
+var reSPCCol = regexp.MustCompile(`\$\*\s{2}Constraint:\s{1}`)
+var reLoadCol = regexp.MustCompile(`\$\*\s{2}Load:\s{1}`)
+var reEOF = regexp.MustCompile(`ENDDATA`)
+//ELEMENT NUMBERING
+//var ADINA_N = [][]int{{1, 2, 3, 4}, {1, 2, 3, 4, 5, 7, 8, 6, 10, 9}, {6, 2, 3, 7, 5, 1, 4, 8}, {6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
+var ADINA = map[int][]int{4:{1, 2, 3, 4},10:{1, 2, 3, 4, 5, 7, 8, 6, 10, 9},8:{6, 2, 3, 7, 5, 1, 4, 8},20:{6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
 
 type dims struct {
 	x    float64
@@ -40,14 +50,14 @@ type element struct {
 	Type        string
 	nodeIndex   []int
 	collector   int
-	orientation [3]float64 // Almost exclusively for beams
+	orientation [3]float64 // Almost exclusively for beams and shells
 }
 
-func NewElement() element {
+func newElement() element {
 	return element{}
 }
 
-type collectors map[string]int
+type collectors map[string]entity
 
 type writerGroup struct {
 	writer *bufio.Writer
@@ -61,9 +71,77 @@ type constraint struct {
 	slaves    []int
 	dof       string
 	collector int
+	// boundary condition for forces
+	dims
+	magnitude float64
 }
 
-func NewConstraint() constraint {
+// DEFINE ENTITY INTEFACE describes both constraints and elements
+type entity interface {
+	getType() string
+	getNumber() int
+	getCollector() int
+	isElement() bool
+	generateUniqueTag() string
+	getConnections() []int
+	getAssociatedVector() (int ,[3]float64)
+	getDOF() string
+}
+func (e element)isElement() bool {
+	return true
+}
+func (c constraint)isElement() bool {
+	return false
+}
+func (c constraint)getType() string {
+	return c.Type
+}
+func (e element)getType() string {
+	return e.Type
+}
+func (c constraint)getNumber() int {
+	return c.number
+}
+func (e element)getNumber() int {
+	return e.number
+}
+func (c constraint)getCollector() int {
+	return c.collector
+}
+func (e element)getCollector() int {
+	return e.collector
+}
+func (e element)getConnections() []int {
+	return e.nodeIndex
+}
+func (c constraint)getConnections() []int {
+	var con []int
+	con = append(con,c.master)
+	if len(c.slaves)>0 {
+		for _, v := range c.slaves {
+			con = append(con,v)
+		}
+	}
+	return con
+}
+func (e element)getAssociatedVector() (int, [3]float64) {
+	return 0,e.orientation
+}
+func (c constraint)getAssociatedVector() (int ,[3]float64) {
+	var vec [3]float64
+	vec[0] = c.x * c.magnitude
+	vec[1] = c.y * c.magnitude
+	vec[2] = c.z * c.magnitude
+	return c.csys,vec
+}
+func (e element)getDOF() string {
+	return ""
+}
+func (c constraint)getDOF() string {
+	return c.dof
+}
+
+func newConstraint() constraint {
 	return constraint{}
 }
 
@@ -82,46 +160,73 @@ func readMeshCollectors(nastrandir string) (collectors, error) {
 	reElemStart := regexp.MustCompile(`ELEMENT CARDS`)
 	var line = 0
 	for scanner.Scan() { // Saltea las lineas hasta el comienzo de los elementos
-
 		line++
 		if reElemStart.MatchString(scanner.Text()) {
 			break
 		}
-
 	}
-	reMeshCol := regexp.MustCompile(`\$\*\s{2}Mesh Collector:\s{1}`)
+	var finishedElements bool
 	for scanner.Scan() {
-		text := scanner.Text()
-		text = text + ""
-		line++
+		text := scanner.Text() + ""; line++
+		collectorName := parseCollectorName(text) // =="" if not collector name
+		var linesRead int
+
 		if reElemEnd.MatchString(scanner.Text()) {
-			return meshcol, nil
-		} // Si encontramos con el final devolvemos lo que encontramos
-		if reMeshCol.MatchString(scanner.Text()) { // I first find my mesh collector here
-			collectorName := scanner.Text()[20:]
-			// meshcol.tags =append(meshcol.tags, scanner.Text()[20:])
-			text = scanner.Text()
-			text = text + ""
-			currentConstraint, currentElement, linesRead, err := readNextElement(scanner)
-			line += linesRead
-			if err != nil {
-				return meshcol, err
-			}
-			if currentConstraint.slaves != nil {
-				meshcol[collectorName] = currentConstraint.collector
-				continue
-			}
-			if currentElement.nodeIndex != nil && currentConstraint.slaves == nil {
-				meshcol[collectorName] = currentElement.collector
-			} else {
-				break
-			} //We done looking for collectors
+			finishedElements = true
+		}
+		if finishedElements && collectorName != "" {
+			meshcol[collectorName] , linesRead, err = readNextElement(scanner)
+		}
+		if !finishedElements && collectorName != ""  { // I first find my mesh collector here
+			meshcol[collectorName] , linesRead, err = readNextElement(scanner)
+		}
+		line += linesRead
+		if err != nil {
+			return meshcol, err
 		}
 	}
 	return meshcol, nil
 }
 
-func writeMeshCollector(nastrandir string, Acol string, numbering int) error {
+func writeEntity(E entity, writer *bufio.Writer, numbering int) error {
+	defer writer.WriteString("\n") // Deferamos el newline del final de la tabla
+	// Print DOF and entity number
+	if E.getDOF() != "" { // DOF puede ser vacio
+		writer.WriteString(fmt.Sprintf("%s , %d", E.getDOF(), E.getNumber()))
+	} else {
+		writer.WriteString(fmt.Sprintf("%d", E.getNumber()))
+	}
+
+	// Print connections
+	var connections = E.getConnections()
+	var connectionIndex []int
+	if numbering==0 && len(ADINA[len(connections)])>0 && E.isElement() {
+		connectionIndex = ADINA[len(connections)]
+	} else {
+		connectionIndex = irange(1,len(connections))
+	}
+	for _, v := range connectionIndex {
+		_, err := writer.WriteString(fmt.Sprintf(",%d", connections[v-1]))
+		if err != nil {
+			return err
+		}
+	}
+	// Print associated vector if present
+	var vec [3]float64
+	var _ int //  would be csys
+	_, vec = E.getAssociatedVector()
+	if !(vec[0] == 0 && vec[1] == 0 && vec[2] == 0) {
+		for v := range vec {
+			_, err := writer.WriteString(fmt.Sprintf(",%e", vec[v]))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func writeCollector(nastrandir string, Acol string, numbering int) error {
 	dataFile, err := os.Open(nastrandir)
 	if err != nil {
 		return err
@@ -132,166 +237,75 @@ func writeMeshCollector(nastrandir string, Acol string, numbering int) error {
 	scanner := bufio.NewScanner(dataFile)
 	//reCollectorName := regexp.MustCompile(Acol)
 	line := 0
-
+	var text string
 	for scanner.Scan() {
-		text := scanner.Text()
-		text = text + ""
-		line++
-		if strings.Contains(scanner.Text(), "$*  Mesh Collector: "+Acol) {
-			scanner.Scan()
+		text = scanner.Text() + ""; line++
+		collectorName := parseCollectorName(text)
+
+		if collectorName == Acol  {
 			for scanner.Scan() {
-				line++
-				if reNASTRANcomment.MatchString(scanner.Text()) && !(strings.Contains(scanner.Text(), "$*  Mesh Collector: "+Acol)) {
+				text = scanner.Text() + ""; line++
+				var E entity
+				collectorFound := parseCollectorName(text)
+				if (collectorFound != Acol && collectorFound != "") || reEOF.MatchString(text) || reElemEnd.MatchString(text)  {
 					break
 				}
-				constrainto, elemento, linesRead, err := readNextElement(scanner)
+				if reNASTRANcomment.MatchString(text) {
+					continue
+				}
+				E, linesRead, err := readNextElement(scanner)
+				text = scanner.Text() + ""; line += linesRead
 				if err != nil {
 					return err
 				}
-				line += linesRead
-				if elemento.nodeIndex != nil { // Si es un elemento, lo escribo a su respectivo archivo
-					elementTag := generateElementTag(*elemento)
-					_, present := writers[elementTag]
-					if !present { // Si no hay un archivo correspondiente al elemento, lo creo
-						elementFile, err := os.Create(elementTag + fmt.Sprintf("-%d", elemento.collector) + ".csv")
-						if err != nil {
-							return err
-						}
-						elementWriter := bufio.NewWriter(elementFile)
-						writers[elementTag] = writerGroup{
-							writer: elementWriter,
-							file:   elementFile,
-						}
-						defer writers[elementTag].Close()
-					}
-					// Sigo acá, Ahora si o si tengo un archivo para escribir
-					err = writeElement(elemento, writers[elementTag].writer, numbering)
+				entityTag := E.generateUniqueTag()
+				_, present := writers[entityTag]
+				if !present { // Si no hay un archivo correspondiente a la entidad, lo creo
+					elementFile, err := os.Create(fmt.Sprintf("%s.csv",entityTag) )
 					if err != nil {
 						return err
 					}
-					err = writers[elementTag].writer.Flush()
-					if err != nil {
-						return err
+					elementWriter := bufio.NewWriter(elementFile)
+					writers[entityTag] = writerGroup{
+						writer: elementWriter,
+						file:   elementFile,
 					}
-					continue
+					defer writers[entityTag].Close()
+				} // Sigo acá, Ahora si o si tengo un archivo para escribir
+				err = writeEntity(E, writers[entityTag].writer, numbering)
+				if err != nil {
+					return err
 				}
-				if constrainto.slaves != nil { // Si es un constraint
-					_, present := writers[constrainto.Type]
-					if !present { // Si no hay un archivo correspondiente al elemento, lo creo
-						constraintFile, err := os.Create(constrainto.Type + "-" + Acol + ".csv")
-						if err != nil {
-							return err
-						}
-						constraintWriter := bufio.NewWriter(constraintFile)
-						writers[constrainto.Type] = writerGroup{
-							writer: constraintWriter,
-							file:   constraintFile,
-						}
-						defer writers[constrainto.Type].Close()
-					}
-					err = writeConstraint(constrainto, writers[constrainto.Type].writer)
-					writers[constrainto.Type].writer.Flush()
-					if err != nil {
-						return err
-					}
-					err = writers[constrainto.Type].writer.Flush()
-					if err != nil {
-						return err
-					}
-					break // break para no saltear el prox rigid link
+				err = writers[entityTag].writer.Flush()
+				if err != nil {
+					return err
 				}
 			}
-
 		}
-
-	}
-	//nodeFile, err := os.Create(writedir)
-	return nil
-}
-
-func writeConstraint(constrainto *constraint, writer *bufio.Writer) error {
-	_, err := writer.WriteString(fmt.Sprintf("%d", constrainto.number))
-	if err != nil {
-		return err
-	}
-	_, err = writer.WriteString(fmt.Sprintf(",%d", constrainto.master))
-	if err != nil {
-		return err
-	}
-	for _, v := range constrainto.slaves {
-		_, err = writer.WriteString(fmt.Sprintf(",%d", v))
-		if err != nil {
-			return err
-		}
-	}
-	_, err = writer.WriteString(fmt.Sprintf("\n"))
-	return err
-}
-
-func writeElement(elemento *element, writer *bufio.Writer, numbering int) error {
-	// numbering == 0, ADINA.    numbering == 1  NASTRAN
-	_, err := writer.WriteString(fmt.Sprintf("%d", elemento.number))
-	if err != nil {
-		return err
-	}
-	var elemIndex []int
-	switch numbering {
-	case 0: // ADINA
-		switch len(elemento.nodeIndex) {
-		case 4: // T4 (Tetraedro 4 nodos)
-			elemIndex = []int{1, 2, 3, 4}
-		case 10: // T10
-			elemIndex = []int{1, 2, 3, 4, 5, 7, 8, 6, 10, 9}
-		case 8:
-			elemIndex = []int{6, 2, 3, 7, 5, 1, 4, 8}
-		case 20:
-			elemIndex = []int{6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}
-		default:
-			elemIndex = irange(1, len(elemento.nodeIndex))
-		}
-	default:
-		elemIndex = irange(1, len(elemento.nodeIndex))
-	}
-	for _, v := range elemIndex {
-		_, err := writer.WriteString(fmt.Sprintf(",%d", elemento.nodeIndex[v-1]))
-		if err != nil {
-			return err
-		}
-	}
-	if !(elemento.orientation[0] == 0 && elemento.orientation[1] == 0 && elemento.orientation[2] == 0) {
-		for v := range elemento.orientation {
-			_, err := writer.WriteString(fmt.Sprintf(",%e", elemento.orientation[v]))
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Newline
-	_, err = writer.WriteString(fmt.Sprintf("\n"))
-	if err != nil {
-		return err
 	}
 	return nil
 }
 
-func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error) {
-	eleitem := NewElement()
-	constraintitem := NewConstraint()
+func readNextElement(scanner *bufio.Scanner) (entity, int, error) {
+	var E entity
+	eleitem := newElement()
+	constraintitem := newConstraint()
 	linesScanned := 0
 	var err error
 	var eleType, eleLine string
 	eleType = reElementType.FindString(scanner.Text()) // Tal vez estoy parado sobre comienzo de un elemento
 	if reElemEnd.MatchString(scanner.Text()) {
-		return &constraintitem, &eleitem, linesScanned, nil
+		return E, linesScanned, nil
 	}
 	if eleType == "" {
 		for scanner.Scan() {
-			//text := scanner.Text()
-			//text = text+""
+			if reNASTRANcomment.MatchString(scanner.Text())  {
+				continue
+			}
 			linesScanned++
 			eleType = reElementType.FindString(scanner.Text())
 			if reElemEnd.MatchString(scanner.Text()) {
-				return &constraintitem, &eleitem, linesScanned, nil
+				return E, linesScanned, nil
 			} // Verfificacion EOF
 			if eleType == "" {
 				continue
@@ -318,25 +332,72 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 			integerStrings := reInteger.FindAllString(eleLine, -1)
 			constraintitem.number, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[0], ""))
 			if err != nil {
-				return &constraintitem, &eleitem, linesScanned, err
+				return E, linesScanned, err
 			}
 			constraintitem.Type = v
 			constraintitem.master, err = strconv.Atoi(reNonNumerical.ReplaceAllString(integerStrings[1], ""))
 			if err != nil {
-				return &constraintitem, &eleitem, linesScanned, err
+				return E, linesScanned, err
 			}
 			constraintitem.dof = integerStrings[2]
 			constraintitem.slaves, err = Aslicetoi(integerStrings[3:])
-			return &constraintitem, &eleitem, linesScanned, err
+			E = constraintitem
+			return E, linesScanned, err
 		}
 	}
+
+	for _, v := range bcTypes {
+		if v == eleType { //if true we are dealing with a boundary condition
+			splitline := splitFortranLine(eleLine)
+			constraintitem.Type = strings.TrimSpace(splitline[0])
+			constraintitem.collector, err = strconv.Atoi(reNonNumerical.ReplaceAllString(splitline[1], ""))
+			if err != nil {
+				return E, linesScanned, err
+			}
+			constraintitem.master , err = strconv.Atoi(strings.TrimSpace(splitline[2]))
+			if err != nil {
+				return E, linesScanned, err
+			}
+
+			if eleType=="SPC" {
+				constraintitem.dof  = strings.TrimSpace(splitline[3])
+				constraintitem.magnitude, err = parseFortranFloat(splitline[4])
+			}
+			if eleType=="FORCE" {
+				constraintitem.csys, err  = strconv.Atoi(reNonNumerical.ReplaceAllString(splitline[3], ""))
+				if err != nil {
+					return E, linesScanned, err
+				}
+				constraintitem.magnitude, err = parseFortranFloat(splitline[4])
+				if err != nil {
+					return E, linesScanned, err
+				}
+				constraintitem.x, err = parseFortranFloat(splitline[5])
+				if err != nil {
+					return E, linesScanned, err
+				}
+				constraintitem.y, err = parseFortranFloat(splitline[6])
+				if err != nil {
+					return E, linesScanned, err
+				}
+				constraintitem.z, err = parseFortranFloat(splitline[7])
+			}
+			if err != nil {
+				return E, linesScanned, err
+			}
+			E = constraintitem
+			return E, linesScanned, err
+		}
+	}
+
+
 	if !reElementStart.MatchString(eleLine) && reBeamStart.MatchString(eleLine) { // We are dealing with a beam
 		integerList := []int{} // two nodes in integerStrings
 
 		for i:=0; i<=3 ; i++ {
 			myCurrentInt, err := strconv.Atoi(reNonNumerical.ReplaceAllString(eleLine[(i+1)*8:(i+2)*8], ""))
 			if err != nil {
-				return &constraintitem, &eleitem, linesScanned, err
+				return E, linesScanned, err
 			}
 			integerList = append(integerList, myCurrentInt ) // genero lista de BEAM integers. fixed width opportunity
 		}
@@ -347,22 +408,24 @@ func readNextElement(scanner *bufio.Scanner) (*constraint, *element, int, error)
 		for v := range eleitem.orientation {
 			eleitem.orientation[v], err = parseFortranFloat(eleLine[40+v*8 : 48+v*8])
 			if err != nil {
-				return &constraintitem, &eleitem, linesScanned, err
+				return E, linesScanned, err
 			}
 		}
 		eleitem.Type = "CBEAM"
-		return &constraintitem, &eleitem, linesScanned, err
+		E = eleitem
+		return E, linesScanned, err
 	}
 	integerStrings := reInteger.FindAllString(eleLine, -1)
 	integerSlice, err := Aslicetoi(integerStrings)
 	if err != nil {
-		return &constraintitem, &eleitem, linesScanned, err
+		return E, linesScanned, err
 	}
 	eleitem.number = integerSlice[0]
 	eleitem.Type = eleType
 	eleitem.collector = integerSlice[1]
 	eleitem.nodeIndex = integerSlice[2:]
-	return &constraintitem, &eleitem, linesScanned, err
+	E = eleitem
+	return E, linesScanned, err
 }
 
 func Aslicetoi(stringSlice []string) ([]int, error) {
@@ -467,9 +530,13 @@ func assignDims(dimensions *dims, floatString []string) {
 	}
 }
 
-func generateElementTag(elemento element) string {
+func (constrainto constraint)generateUniqueTag() string {
+	return fmt.Sprintf(  "%s-%d",constrainto.Type,  constrainto.collector)
+}
+
+func (elemento element)generateUniqueTag() string {
 	Nnodos := len(elemento.nodeIndex)
-	return elemento.Type + strconv.Itoa(Nnodos)
+	return fmt.Sprintf(  "%s%d-%d",elemento.Type, Nnodos, elemento.collector)
 }
 
 func (group writerGroup) Close() {
@@ -491,4 +558,29 @@ func irange(int1 int, int2 int) []int {
 		}
 	}
 	return slice
+}
+
+func splitFortranLine(linestr string) []string {
+	var N = len(linestr)
+	split := []string{}
+	var current = ""
+	for i:=0; i<N; i++ {
+		current = current + string(linestr[i])
+		if (i+1)%8 == 0  {
+			split = append(split,current)
+			current = ""
+		}
+	}
+	if len(current)>0 {
+		split = append(split,current)
+	}
+	return split
+}
+
+func parseCollectorName(text string) string {
+	var collectorName string
+	if reMeshCol.MatchString(text) || reSPCCol.MatchString(text) || reLoadCol.MatchString(text) {
+		collectorName = text[strings.Index(text,":")+2:]
+	}
+	return collectorName
 }
