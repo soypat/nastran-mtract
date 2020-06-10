@@ -1,33 +1,41 @@
 package main
 
 import (
+	"bufio"
 	ui "github.com/gizak/termui/v3"
 	_ "github.com/gizak/termui/v3/widgets"
 	"log"
+	"os"
 	"strconv"
 	"time"
 )
 
 func main() {
+	// First check file directory if files present
+	_, fileNames, err := fileListCurrentDirectory(10)
+	if err != nil {
+		waitForUserInput("Could not read directory.\nPress [ENTER] to end program.")
+		os.Exit(1)
+	} else if len(fileNames) == 0 {
+		waitForUserInput("No compatible .dat/.txt files found.\nPress [ENTER] to end program.")
+		os.Exit(1)
+	}
+
+
 	if err := ui.Init(); err != nil { // Inicializo el command line UI
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
 	defer ui.Close()
+
 	// Creo primer menu para otorgarle espacio
 	selly := NewSelector()
 	selly.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{1, 3, 0}, [3]int{2, 3, 0})
 	fileListWidth, _ := selly.GetDims()
-
 	displayFileNames, fileNames, err := fileListCurrentDirectory(fileListWidth)
-	if err != nil {
-		log.Fatalf("Failed file search: %v", err)
-	} else if len(fileNames) == 0 {
-		log.Fatalf("No se encontraron archivos compatibles")
-	}
 	selly.options = displayFileNames
 	poller := NewPoller()
 	poller.selector = &selly
-	selly.title = "Seleccione su archivo NASTRAN"
+	selly.title = "Select NASTRAN file. [q] to exit."
 	selly.Init()
 	poller.InitPoll()
 	defer close(poller.askedToPoll)
@@ -49,7 +57,7 @@ func main() {
 	// MENU PARA ELEGIR NUMERACION DE ELEMENTOS
 	elementNumberingSelector := NewSelector()
 	elementNumberingSelector.options = []string{"ADINA", "NASTRAN"}
-	elementNumberingSelector.title = "Elegir tipo de numeración"
+	elementNumberingSelector.title = "Select element numbering."
 	elementNumberingSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{1, 3, 0}, [3]int{2, 3, 0})
 	poller.selector = &elementNumberingSelector
 	elementNumberingSelector.Init()
@@ -68,7 +76,7 @@ func main() {
 	collectorSelector := NewSelector()
 	collectorSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{2, 3, 0}, [3]int{3, 3, 0})
 	collectorSelector.options = meshcol.KeySlice()
-	collectorSelector.title = "Procesamiento de colector"
+	collectorSelector.title = "Colector processing"
 	poller.selector = &collectorSelector
 	collectorSelector.Init()
 	collectorSelector.Render()
@@ -83,15 +91,15 @@ func main() {
 			if selectedEntity.getNumber() == 0 { // Constraint Selection
 				err = writeCollector(fileDir, collectorName, elementNumbering)
 				if err != nil {
-					collectorSelector.title = "Error al leer constraint collector."
+					collectorSelector.title = "Error reading constraint."
 					collectorSelector.Render()
 				} else {
-					collectorSelector.title = "Completed constraint: " + collectorName + ". Presione [q] para salir."
+					collectorSelector.title = "Completed constraint: " + collectorName + ". Press [q] to exit.q"
 					collectorSelector.Render()
 				}
 			} else {
 				err = writeCollector(fileDir, collectorName, elementNumbering)
-				collectorSelector.title = "Completed " + strconv.Itoa(selectedEntity.getNumber()) + ". Presione [q] para salir. Patricio Whittingslow 2019. Github: soypat"
+				collectorSelector.title = "Completed " + strconv.Itoa(selectedEntity.getNumber()) + ". Press [q] to exit. Patricio Whittingslow 2019. Github: soypat"
 				collectorSelector.Render()
 			}
 		}
@@ -99,7 +107,12 @@ func main() {
 	}
 	// end of program.
 }
-
-func dbslp() { // Debug sleep
-	time.Sleep(time.Millisecond * 1000)
+func waitForUserInput(message string) string {
+	if message == "" {
+		message = "\nPress a [Enter] to continue...\n"
+	}
+	input := bufio.NewScanner(os.Stdin)
+	_,_ = os.Stdout.WriteString(message)
+	input.Scan()
+	return input.Text()
 }
