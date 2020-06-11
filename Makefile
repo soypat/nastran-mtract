@@ -1,6 +1,10 @@
 binname = emtract
 buildflags = -ldflags="-s -w" -i
+examplesfolder = examples
 
+distr: win
+	zip nastran-emtract ${examplesfolder}/nodos.csv ${examplesfolder}/CTETRA4-2.csv ${examplesfolder}/ejemplo1.dat ${examplesfolder}/cargarNastran.m ${examplesfolder}/ejemplo2.dat
+	zip -j nastran-emtract bin/emtract.exe
 win:
 	GOOS=windows GOARCH=amd64 go build ${buildflags} -o bin/${binname}.exe
 

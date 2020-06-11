@@ -29,3 +29,5 @@ bin/*
 
 # We are big boys, only typescript
 *.js
+
+*.zip

@@ -56,9 +56,9 @@ func main() {
 	}
 	// MENU PARA ELEGIR NUMERACION DE ELEMENTOS
 	elementNumberingSelector := NewSelector()
-	elementNumberingSelector.options = []string{"ADINA", "NASTRAN"}
-	elementNumberingSelector.title = "Select element numbering."
-	elementNumberingSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{1, 3, 0}, [3]int{2, 3, 0})
+	elementNumberingSelector.options = []string{"ADINA", "NASTRAN (not recommended)"}
+	elementNumberingSelector.title = "Select element numbering. ADINA recommended for MATLAB use."
+	elementNumberingSelector.fitting = CreateFitting([3]int{0, 1, 0}, [3]int{0, 1, 0}, [3]int{2, 3, 0}, [3]int{2, 3, 0})
 	poller.selector = &elementNumberingSelector
 	elementNumberingSelector.Init()
 	elementNumberingSelector.Render()

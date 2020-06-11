@@ -11,7 +11,7 @@ $*        SOLUTION TYPE: SOL 101 Linear Statics - Global Constraints
 $*
 $*    SOLVER INPUT FILE: choto_sim1-solution_1.dat
 $*        CREATION DATE: 10-Oct-2019
-$*        CREATION TIME: 22:17:29
+$*        CREATION TIME: 22:11:58
 $*             HOSTNAME: COOLMASTER
 $*      NASTRAN LICENSE: Desktop Bundle
 $*
@@ -3067,47 +3067,6 @@ RBE2         480    1002  123456     463     464     465     466     467+
 $*  Mesh Collector: dabeam
 $*  Mesh: connection_recipe_2_mesh
 CBEAM        481       3    1002    1003  0.00001.000000-4.69-14
-$*  Mesh Collector: dabeam
-$*  Mesh: connection_recipe_3_mesh
-CBEAM        482       3    1003    1004-1.00000-3.235-7  0.0000
-$*  Mesh Collector: dabeam
-$*  Mesh: connection_recipe_4_mesh
-CBEAM        483       3    1004    1005  0.00001.000000  0.0000
-$*  Mesh Collector: dabeam
-$*  Mesh: connection_recipe_5_mesh
-CBEAM        484       3    1005    1006-1.000002.750-10  0.0000
-$*  Mesh Collector: dabeam
-$*  Mesh: 1d_mesh(1)
-CBEAM        485       3     993     9250.0274630.999623  0.0000
-CBEAM        486       3     925     9170.0823070.996607  0.0000
-CBEAM        487       3     917     9260.1369010.990585  0.0000
-CBEAM        488       3     926     9180.1910830.981574  0.0000
-CBEAM        489       3     918     9240.2446900.969601  0.0000
-CBEAM        490       3     924     9190.2975550.954705  0.0000
-CBEAM        491       3     919     9230.3495230.936928  0.0000
-CBEAM        492       3     923     9200.4004420.916322  0.0000
-CBEAM        493       3     920     9290.4501480.892954  0.0000
-CBEAM        494       3     929     9210.4984950.866893  0.0000
-CBEAM        495       3     921     9280.5453420.838214  0.0000
-CBEAM        496       3     928     9220.5905420.807007  0.0000
-CBEAM        497       3     922     9270.6339590.773367  0.0000
-CBEAM        498       3     927     9940.6754650.737392  0.0000
-$*  Mesh Collector: dabeam
-$*  Mesh: 1d_mesh(2)
-CBEAM        499       3     604     5300.0274630.999623  0.0000
-CBEAM        500       3     530     5180.0823070.996607  0.0000
-CBEAM        501       3     518     5290.1369010.990585  0.0000
-CBEAM        502       3     529     5190.1910830.981574  0.0000
-CBEAM        503       3     519     5280.2446900.969601  0.0000
-CBEAM        504       3     528     5200.2975550.954705  0.0000
-CBEAM        505       3     520     5250.3495230.936928  0.0000
-CBEAM        506       3     525     5210.4004420.916322  0.0000
-CBEAM        507       3     521     5260.4501480.892954  0.0000
-CBEAM        508       3     526     5220.4984950.866893  0.0000
-CBEAM        509       3     522     5270.5453420.838214  0.0000
-CBEAM        510       3     527     5230.5905420.807007  0.0000
-CBEAM        511       3     523     5240.6339590.773367  0.0000
-CBEAM        512       3     524     6050.6754650.737392  0.0000
 $*
 $* PROPERTY CARDS
 $*
@@ -3210,4 +3169,4 @@ SPC            1    1000  123456  0.0000
 SPC            1    1001  123456  0.0000
 $*  Load: Force(1)
 FORCE          2    1003       01.0000+6  0.0000-1.00000  0.0000
-ENDDATA 944e0202
+ENDDATA 53537bcc
