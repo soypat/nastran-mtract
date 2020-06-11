@@ -30,4 +30,6 @@ bin/*
 # We are big boys, only typescript
 *.js
 
+# Makfile 
+!examples/**.csv
 *.zip
