@@ -99,7 +99,7 @@ func main() {
 				}
 			} else {
 				err = writeCollector(fileDir, collectorName, elementNumbering)
-				collectorSelector.title = "Completed " + strconv.Itoa(selectedEntity.getNumber()) + ". Press [q] to exit. Patricio Whittingslow 2019. Github: soypat"
+				collectorSelector.title = "Completed " + strconv.Itoa(selectedEntity.getNumber()) + ". Press [q] to exit. Patricio Whittingslow 2020. Github: soypat"
 				collectorSelector.Render()
 			}
 		}
