@@ -10,20 +10,30 @@ Run executable in directory above that of the NASTRAN file, which should be in .
 Follow on screen instructions (spanish). Use arrow-keys to navigate and press [ENTER]/[INTRO] 
 to select option.
 
-ADINA element node indexing only works for beams, constraints and H8, H20, T4, T10 (3-D) elements.
+Boundary conditions (SPC) will be printed with a zero column which does not correspond to any value.
 
+## Outputs
 
-OUTPUT  NODES: nodos.csv
+### nodos.csv
 
-NodeNumber,  x,  y,  z,  csys/t
+nodeNumber,  x,  y,  z,  csys/t
 
-OUTPUT ELEMENT:  ElementType(NumberofNodes)-(CollectorNumber).csv
+### ElementType(NumberofNodes)-(CollectorNumber).csv
 
-ElementNumber, Node1, Node2, Node3, ... ,  NodeN
+elementNumber, Node1, Node2, Node3, ... ,  NodeN
 
-OUTPUT CONSTRAINT:  ConstraintType-(CollectorNumber).csv
+### ConstraintType-(CollectorNumber).csv
 
 affectedDOF , ElementNumber,  NodeMaster, NodeSlave1, NodeSlave2, ... ,  NodeSlaveN
+
+### BoundaryCondition-(CollectorNumber).csv
+
+AffectedDOF , 0,  NodeNumber
+
+### Force-(CollectorNumber).csv
+
+csys , AffectedNode,  x-Force, y-Force, z-Force
+
 
 
 Written in Go.
