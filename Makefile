@@ -4,7 +4,10 @@ examplesfolder = examples
 
 distr: win
 	cp README.md README.txt
-	zip nastran-emtract ${examplesfolder}/nodos.csv ${examplesfolder}/CTETRA4-2.csv ${examplesfolder}/ejemplo1.dat ${examplesfolder}/cargarNastran.m ${examplesfolder}/ejemplo2.dat
+	# zip data files
+	zip nastran-emtract ${examplesfolder}/nodos.csv ${examplesfolder}/CTETRA4-2.csv ${examplesfolder}/ejemplo1.dat ${examplesfolder}/ejemplo2.dat
+	# zip matlab files
+	zip nastran-emtract ${examplesfolder}/cargarNastran.m  ${examplesfolder}/preprocnodos.m ${examplesfolder}/bandplotx.m
 	zip -j nastran-emtract bin/emtract.exe README.txt
 	rm README.txt
 win:
