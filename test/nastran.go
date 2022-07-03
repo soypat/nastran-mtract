@@ -211,10 +211,10 @@ func (n *nastran) addForce(f force, collectorIfAny string) {
 }
 
 func (n *nastran) addSPC(s spc, collectorIfAny string) {
-	if collectorIfAny != "" && n.spcsCollector.number(collectorIfAny) < 0 {
-		n.spcsCollector.addDirect(s.collector, collectorIfAny)
-	} else {
+	if collectorIfAny == "" {
 		s.collector = -1
+	} else if n.spcsCollector.number(collectorIfAny) < 0 {
+		n.spcsCollector.addDirect(s.collector, collectorIfAny)
 	}
 	n.spcs = append(n.spcs, s)
 }

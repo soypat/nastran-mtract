@@ -20,6 +20,7 @@ var reElemEnd = regexp.MustCompile(`PROPERTY CARDS`)
 var reEOLContinue = regexp.MustCompile(`[+]{1}$`)
 var reSOLContinue = regexp.MustCompile(`^[+]{1}`)
 var reInteger = regexp.MustCompile(`\s+\d+[^.A-Za-z+\$]`)
+
 //var reDecimal = regexp.MustCompile(`[-]{0,1}\d{1}\.\d{4}`)
 var reNonNumerical = regexp.MustCompile(`[A-Za-z\*\+\-\s,]+`)
 var reNASTRANcomment = regexp.MustCompile(`^[$]`)
@@ -28,9 +29,10 @@ var reMeshCol = regexp.MustCompile(`\$\*\s{2}Mesh Collector:\s{1}`)
 var reSPCCol = regexp.MustCompile(`\$\*\s{2}Constraint:\s{1}`)
 var reLoadCol = regexp.MustCompile(`\$\*\s{2}Load:\s{1}`)
 var reEOF = regexp.MustCompile(`ENDDATA`)
+
 //ELEMENT NUMBERING
 //var ADINA_N = [][]int{{1, 2, 3, 4}, {1, 2, 3, 4, 5, 7, 8, 6, 10, 9}, {6, 2, 3, 7, 5, 1, 4, 8}, {6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
-var ADINA = map[int][]int{10:{1, 2, 3, 4, 5, 7, 8, 6, 10, 9},8:{6, 2, 3, 7, 5, 1, 4, 8},20:{6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
+var ADINA = map[int][]int{10: {1, 2, 3, 4, 5, 7, 8, 6, 10, 9}, 8: {6, 2, 3, 7, 5, 1, 4, 8}, 20: {6, 2, 3, 7, 5, 1, 4, 8, 14, 10, 15, 18, 13, 12, 16, 20, 17, 9, 11, 19}}
 
 type dims struct {
 	x    float64
@@ -84,60 +86,61 @@ type entity interface {
 	isElement() bool
 	generateUniqueTag() string
 	getConnections() []int
-	getAssociatedVector() (int ,[3]float64)
+	getAssociatedVector() (int, [3]float64)
 	getDOF() string
 }
-func (e element)isElement() bool {
+
+func (e element) isElement() bool {
 	return true
 }
-func (c constraint)isElement() bool {
+func (c constraint) isElement() bool {
 	return false
 }
-func (c constraint)getType() string {
+func (c constraint) getType() string {
 	return c.Type
 }
-func (e element)getType() string {
+func (e element) getType() string {
 	return e.Type
 }
-func (c constraint)getNumber() int {
+func (c constraint) getNumber() int {
 	return c.number
 }
-func (e element)getNumber() int {
+func (e element) getNumber() int {
 	return e.number
 }
-func (c constraint)getCollector() int {
+func (c constraint) getCollector() int {
 	return c.collector
 }
-func (e element)getCollector() int {
+func (e element) getCollector() int {
 	return e.collector
 }
-func (e element)getConnections() []int {
+func (e element) getConnections() []int {
 	return e.nodeIndex
 }
-func (c constraint)getConnections() []int {
+func (c constraint) getConnections() []int {
 	var con []int
-	con = append(con,c.master)
-	if len(c.slaves)>0 {
+	con = append(con, c.master)
+	if len(c.slaves) > 0 {
 		for _, v := range c.slaves {
-			con = append(con,v)
+			con = append(con, v)
 		}
 	}
 	return con
 }
-func (e element)getAssociatedVector() (int, [3]float64) {
-	return 0,e.orientation
+func (e element) getAssociatedVector() (int, [3]float64) {
+	return 0, e.orientation
 }
-func (c constraint)getAssociatedVector() (int ,[3]float64) {
+func (c constraint) getAssociatedVector() (int, [3]float64) {
 	var vec [3]float64
 	vec[0] = c.x * c.magnitude
 	vec[1] = c.y * c.magnitude
 	vec[2] = c.z * c.magnitude
-	return c.csys,vec
+	return c.csys, vec
 }
-func (e element)getDOF() string {
+func (e element) getDOF() string {
 	return ""
 }
-func (c constraint)getDOF() string {
+func (c constraint) getDOF() string {
 	return c.dof
 }
 
@@ -167,7 +170,8 @@ func readMeshCollectors(nastrandir string) (collectors, error) {
 	}
 	var finishedElements bool
 	for scanner.Scan() {
-		text := scanner.Text() + ""; line++
+		text := scanner.Text() + ""
+		line++
 		collectorName := parseCollectorName(text) // =="" if not collector name
 		var linesRead int
 
@@ -175,10 +179,10 @@ func readMeshCollectors(nastrandir string) (collectors, error) {
 			finishedElements = true
 		}
 		if finishedElements && collectorName != "" {
-			meshcol[collectorName] , linesRead, err = readNextElement(scanner)
+			meshcol[collectorName], linesRead, err = readNextElement(scanner)
 		}
-		if !finishedElements && collectorName != ""  { // I first find my mesh collector here
-			meshcol[collectorName] , linesRead, err = readNextElement(scanner)
+		if !finishedElements && collectorName != "" { // I first find my mesh collector here
+			meshcol[collectorName], linesRead, err = readNextElement(scanner)
 		}
 		line += linesRead
 		if err != nil {
@@ -200,10 +204,10 @@ func writeEntity(E entity, writer *bufio.Writer, numbering int) error {
 	// Print connections
 	var connections = E.getConnections()
 	var connectionIndex []int
-	if numbering==0 && len(ADINA[len(connections)])>0 && E.isElement() && E.getType() != "CQUAD8" {
+	if numbering == 0 && len(ADINA[len(connections)]) > 0 && E.isElement() && E.getType() != "CQUAD8" {
 		connectionIndex = ADINA[len(connections)]
 	} else {
-		connectionIndex = irange(1,len(connections))
+		connectionIndex = irange(1, len(connections))
 	}
 	for _, v := range connectionIndex {
 		_, err := writer.WriteString(fmt.Sprintf(",%d", connections[v-1]))
@@ -239,29 +243,32 @@ func writeCollector(nastrandir string, Acol string, numbering int) error {
 	line := 0
 	var text string
 	for scanner.Scan() {
-		text = scanner.Text() + ""; line++
+		text = scanner.Text() + ""
+		line++
 		collectorName := parseCollectorName(text)
 
-		if collectorName == Acol  {
+		if collectorName == Acol {
 			for scanner.Scan() {
-				text = scanner.Text() + ""; line++
+				text = scanner.Text() + ""
+				line++
 				var E entity
 				collectorFound := parseCollectorName(text)
-				if (collectorFound != Acol && collectorFound != "") || reEOF.MatchString(text) || reElemEnd.MatchString(text)  {
+				if (collectorFound != Acol && collectorFound != "") || reEOF.MatchString(text) || reElemEnd.MatchString(text) {
 					break
 				}
 				if reNASTRANcomment.MatchString(text) {
 					continue
 				}
 				E, linesRead, err := readNextElement(scanner)
-				text = scanner.Text() + ""; line += linesRead
+				text = scanner.Text() + ""
+				line += linesRead
 				if err != nil {
 					return err
 				}
 				entityTag := E.generateUniqueTag()
 				_, present := writers[entityTag]
 				if !present { // Si no hay un archivo correspondiente a la entidad, lo creo
-					elementFile, err := os.Create(fmt.Sprintf("%s.csv",entityTag) )
+					elementFile, err := os.Create(fmt.Sprintf("%s.csv", entityTag))
 					if err != nil {
 						return err
 					}
@@ -299,7 +306,7 @@ func readNextElement(scanner *bufio.Scanner) (entity, int, error) {
 	}
 	if eleType == "" {
 		for scanner.Scan() {
-			if reNASTRANcomment.MatchString(scanner.Text())  {
+			if reNASTRANcomment.MatchString(scanner.Text()) {
 				continue
 			}
 			linesScanned++
@@ -354,17 +361,17 @@ func readNextElement(scanner *bufio.Scanner) (entity, int, error) {
 			if err != nil {
 				return E, linesScanned, err
 			}
-			constraintitem.master , err = strconv.Atoi(strings.TrimSpace(splitline[2]))
+			constraintitem.master, err = strconv.Atoi(strings.TrimSpace(splitline[2]))
 			if err != nil {
 				return E, linesScanned, err
 			}
 
-			if eleType=="SPC" {
-				constraintitem.dof  = strings.TrimSpace(splitline[3])
+			if eleType == "SPC" {
+				constraintitem.dof = strings.TrimSpace(splitline[3])
 				constraintitem.magnitude, err = parseFortranFloat(splitline[4])
 			}
-			if eleType=="FORCE" {
-				constraintitem.csys, err  = strconv.Atoi(reNonNumerical.ReplaceAllString(splitline[3], ""))
+			if eleType == "FORCE" {
+				constraintitem.csys, err = strconv.Atoi(reNonNumerical.ReplaceAllString(splitline[3], ""))
 				if err != nil {
 					return E, linesScanned, err
 				}
@@ -390,16 +397,15 @@ func readNextElement(scanner *bufio.Scanner) (entity, int, error) {
 		}
 	}
 
-
 	if !reElementStart.MatchString(eleLine) && reBeamStart.MatchString(eleLine) { // We are dealing with a beam
 		integerList := []int{} // two nodes in integerStrings
 
-		for i:=0; i<=3 ; i++ {
+		for i := 0; i <= 3; i++ {
 			myCurrentInt, err := strconv.Atoi(reNonNumerical.ReplaceAllString(eleLine[(i+1)*8:(i+2)*8], ""))
 			if err != nil {
 				return E, linesScanned, err
 			}
-			integerList = append(integerList, myCurrentInt ) // genero lista de BEAM integers. fixed width opportunity
+			integerList = append(integerList, myCurrentInt) // genero lista de BEAM integers. fixed width opportunity
 		}
 		eleitem.number = integerList[0]
 		eleitem.collector = integerList[1]
@@ -530,17 +536,17 @@ func assignDims(dimensions *dims, floatString []string) {
 	}
 }
 
-func (constrainto constraint)generateUniqueTag() string {
-	return fmt.Sprintf(  "%s-%d",constrainto.Type,  constrainto.collector)
+func (constrainto constraint) generateUniqueTag() string {
+	return fmt.Sprintf("%s-%d", constrainto.Type, constrainto.collector)
 }
 
-func (elemento element)generateUniqueTag() string {
+func (elemento element) generateUniqueTag() string {
 	name := elemento.getType()
-	if IsNumeric( string(name[len(name)-1]) ) {
-		return fmt.Sprintf(  "%s-%d",name, elemento.collector)
+	if IsNumeric(string(name[len(name)-1])) {
+		return fmt.Sprintf("%s-%d", name, elemento.collector)
 	}
 	Nnodos := len(elemento.nodeIndex)
-	return fmt.Sprintf(  "%s%d-%d",name, Nnodos, elemento.collector)
+	return fmt.Sprintf("%s%d-%d", name, Nnodos, elemento.collector)
 }
 
 func (group writerGroup) Close() {
@@ -568,15 +574,15 @@ func splitFortranLine(linestr string) []string {
 	var N = len(linestr)
 	split := []string{}
 	var current = ""
-	for i:=0; i<N; i++ {
+	for i := 0; i < N; i++ {
 		current = current + string(linestr[i])
-		if (i+1)%8 == 0  {
-			split = append(split,current)
+		if (i+1)%8 == 0 {
+			split = append(split, current)
 			current = ""
 		}
 	}
-	if len(current)>0 {
-		split = append(split,current)
+	if len(current) > 0 {
+		split = append(split, current)
 	}
 	return split
 }
@@ -584,7 +590,7 @@ func splitFortranLine(linestr string) []string {
 func parseCollectorName(text string) string {
 	var collectorName string
 	if reMeshCol.MatchString(text) || reSPCCol.MatchString(text) || reLoadCol.MatchString(text) {
-		collectorName = text[strings.Index(text,":")+2:]
+		collectorName = text[strings.Index(text, ":")+2:]
 	}
 	return collectorName
 }
