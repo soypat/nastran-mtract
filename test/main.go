@@ -40,7 +40,7 @@ func main() {
 		if col == "" {
 			return ""
 		}
-		return col + strings.TrimSpace(el.Type)
+		return fmt.Sprintf("%s%d-%d", strings.TrimSpace(el.Type), len(el.nodeIndex), el.collector)
 	}
 	for _, el := range nast.elements {
 		colName := nast.elemCollector.name(el.collector)
@@ -48,8 +48,8 @@ func main() {
 			recollector.addDirect(el.collector, fullElemName(el))
 		}
 	}
+	fpc, _ = os.Create("RBE2-0.csv")
 	for num, name := range recollector.direct {
-		fpc, _ = os.Create(name + ".csv")
 		for _, el := range nast.elements {
 			if num != el.collector || name != fullElemName(el) {
 				continue
@@ -66,13 +66,19 @@ func main() {
 			}
 			fmt.Fprintln(fpc)
 		}
-		fpc.Close()
 	}
+	fpc.Close()
 	fpc, _ = os.Create("spcs.csv")
 	for _, spc := range nast.spcs {
 		fmt.Fprintf(fpc, "%d,%d,%d,%g\n", spc.collector, spc.affected, spc.dofs, spc.last)
 	}
 	fpc.Close()
+	fpc, _ = os.Create("nodes.csv")
+	for _, nod := range nast.nodes {
+		fmt.Fprintf(fpc, "%d,%g,%g,%g,%g,%d\n", nod.number, nod.x, nod.y, nod.z, nod.t, nod.csys)
+	}
+	fpc.Close()
+
 }
 
 func parseGrid(item string) (node, error) {
@@ -105,15 +111,13 @@ func parseGrid(item string) (node, error) {
 	}, nil
 }
 
-func parseElement(item string, nodes int, oriented bool) (element, error) {
-	if nodes <= 0 {
-		panic("bad nodes")
-	}
+func parseElement(item string, oriented bool) (element, error) {
 	if len(item) < 24 {
 		return element{}, fmt.Errorf("element item too short (%d)", len(item))
 	}
-	if len(item)-24 < nodes*8 {
-		return element{}, fmt.Errorf("item too short (%d) to parse %d element nodes. expected length %d", len(item)-24, nodes, nodes*8)
+	nodStrLen := len(item) - 24
+	if nodStrLen%8 != 0 || nodStrLen == 0 {
+		return element{}, fmt.Errorf("length of node items must be multiple of 8. got length %d", nodStrLen)
 	}
 	en, err := strconv.Atoi(trimFortran(item[8:16]))
 	if err != nil {
@@ -123,12 +127,18 @@ func parseElement(item string, nodes int, oriented bool) (element, error) {
 	if err != nil {
 		return element{}, fmt.Errorf("collector number: %s", err)
 	}
+	var nodes int
+	if oriented {
+		nodes = (nodStrLen - 24) / 8
+	} else {
+		nodes = nodStrLen / 8
+	}
 	var enodes []int
-	for i := 0; i < nodes; i++ {
-		offset := 24 + i*8
+	for iele := 0; iele < nodes; iele++ {
+		offset := 24 + iele*8
 		elNod, err := strconv.Atoi(trimFortran(item[offset : offset+8]))
 		if err != nil {
-			return element{}, fmt.Errorf("parsing %dth node of element: %s", i, err)
+			return element{}, fmt.Errorf("parsing %dth node of element: %s", iele, err)
 		}
 		enodes = append(enodes, elNod)
 	}

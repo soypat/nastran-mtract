@@ -16,19 +16,11 @@ type einfo struct {
 
 var elemInfo = map[string]einfo{
 	ctriaItem: {
-		ordering:    []int{0, 1, 2},
+		ordering:    []int{0, 1, 2, 3, 4, 5},
 		itemNameLen: strings.Index(ctriaItem, " "),
 	},
-	ctria6Item: {
-		ordering:    []int{0, 1, 2, 3, 4, 5},
-		itemNameLen: strings.Index(ctria6Item, " "),
-	},
-	chexa20Item: {
-		ordering:    []int{5, 1, 2, 6, 4, 0, 3, 7, 13, 9, 14, 17, 12, 11, 15, 19, 16, 8, 10, 18},
-		itemNameLen: strings.Index(chexa20Item, " "),
-	},
 	chexaItem: {
-		ordering:    []int{5, 1, 2, 6, 4, 0, 5, 7},
+		ordering:    []int{5, 1, 2, 6, 4, 0, 3, 7, 13, 9, 14, 17, 12, 11, 15, 19, 16, 8, 10, 18},
 		itemNameLen: strings.Index(chexaItem, " "),
 	},
 	ctetraItem: {
@@ -48,18 +40,16 @@ var elemInfo = map[string]einfo{
 }
 
 const (
-	ctriaItem   = "CTRIA   "
-	ctria6Item  = "CTRIA6  "
-	gridItem    = "GRID*   "
-	ctetraItem  = "CTETRA  " // 10 node tetrahedron
-	cbarItem    = "CBAR    "
-	chexaItem   = "CHEXA   " // 8 node  hexahedron
-	chexa20Item = "CHEXA20 " // 20 node hexahedron
-	cbeamItem   = "CBEAM   "
-	rbe2Item    = "RBE2    "
-	rbe3Item    = "RBE3    "
-	forceItem   = "FORCE   "
-	spcItem     = "SPC     "
+	ctriaItem  = "CTRIA   "
+	gridItem   = "GRID*   "
+	ctetraItem = "CTETRA  "
+	cbarItem   = "CBAR    "
+	chexaItem  = "CHEXA   "
+	cbeamItem  = "CBEAM   "
+	rbe2Item   = "RBE2    "
+	rbe3Item   = "RBE3    "
+	forceItem  = "FORCE   "
+	spcItem    = "SPC     "
 )
 
 type nastran struct {
@@ -131,7 +121,7 @@ func (n *nastran) parse(r io.Reader) error {
 
 		case ctetraItem, cbarItem, cbeamItem:
 			einfo := elemInfo[entity]
-			el, err := parseElement(itemStr, len(einfo.ordering), einfo.oriented)
+			el, err := parseElement(itemStr, einfo.oriented)
 			if err != nil {
 				name := entity[:einfo.itemNameLen]
 				return fmt.Errorf("parsing %q element at line(s) %d..%d: %s", name, entityStart, lineNo, err)
