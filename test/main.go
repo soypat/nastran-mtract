@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fpc, _ := os.Create("connectivities.csv")
+	fpc, _ := os.Create("RBE2.csv")
 	for _, conn := range nast.connectivities {
 		fmt.Fprintf(fpc, "%d,%d", conn.collector, conn.main)
 		for _, d := range conn.affected {
@@ -48,10 +48,12 @@ func main() {
 			recollector.addDirect(el.collector, fullElemName(el))
 		}
 	}
-	fpc, _ = os.Create("RBE2-0.csv")
+
 	for num, name := range recollector.direct {
+		fpc, _ = os.Create(name)
 		for _, el := range nast.elements {
-			if num != el.collector || name != fullElemName(el) {
+			fullname := fullElemName(el)
+			if num != el.collector || name != fullname {
 				continue
 			}
 			info := elemInfo[el.Type]
@@ -73,7 +75,7 @@ func main() {
 		fmt.Fprintf(fpc, "%d,%d,%d,%g\n", spc.collector, spc.affected, spc.dofs, spc.last)
 	}
 	fpc.Close()
-	fpc, _ = os.Create("nodes.csv")
+	fpc, _ = os.Create("nodos.csv")
 	for _, nod := range nast.nodes {
 		fmt.Fprintf(fpc, "%d,%g,%g,%g,%g,%d\n", nod.number, nod.x, nod.y, nod.z, nod.t, nod.csys)
 	}
@@ -90,7 +92,7 @@ func parseGrid(item string) (node, error) {
 		return node{}, fmt.Errorf("node number: %s", err)
 	}
 	const (
-		dimOffset = 24
+		dimOffset = 40
 		f64Len    = 16
 	)
 	x, err := strconv.ParseFloat(trimFortran(item[dimOffset:dimOffset+f64Len]), 64)
@@ -105,9 +107,13 @@ func parseGrid(item string) (node, error) {
 	if err != nil {
 		return node{}, fmt.Errorf("z dim: %s", err)
 	}
+	t, err := strconv.ParseFloat(trimFortran(item[dimOffset+3*f64Len:dimOffset+4*f64Len]), 64)
+	if err != nil {
+		return node{}, fmt.Errorf("t dim: %s", err)
+	}
 	return node{
 		number: nn,
-		dims:   dims{x: x, y: y, z: z},
+		dims:   dims{x: x, y: y, z: z, t: t},
 	}, nil
 }
 
@@ -263,9 +269,16 @@ func parseSmallOrientation(items string) (a [3]float64, err error) {
 }
 
 func parseSmallFortranFloat(item string) (f float64, err error) {
+	isNegative := item[0] == '-'
+	if isNegative {
+		item = item[1:]
+	}
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("parsing small fortran float %q: %s", item, err)
+		}
+		if isNegative {
+			f = -f
 		}
 	}()
 	if !strings.Contains(item, "E") && (strings.Index(item, "-") > 0 || strings.Index(item, "+") > 0) {
